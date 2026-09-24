@@ -1,0 +1,804 @@
+# Clash Verge Rev / Mihomo 官方订阅扩展版（不含节点）
+# 机场官方远程订阅负责节点；本扩展接管 DNS、策略组和分流规则。
+# 策略组通过 include-all 动态读取官方订阅里的节点。
+
+
+mixed-port: 7890
+allow-lan: false
+bind-address: 127.0.0.1
+mode: rule
+log-level: info
+ipv6: false
+unified-delay: true
+tcp-concurrent: true
+find-process-mode: strict
+
+profile:
+  store-selected: true
+  store-fake-ip: true
+
+# Windows 建议在 Clash Verge Rev 中启用服务模式后使用 TUN。
+# strict-route 会针对 Windows 多宿主 DNS 行为添加防泄漏规则。
+tun:
+  enable: true
+  stack: mixed
+  auto-route: true
+  auto-detect-interface: true
+  strict-route: true
+  dns-hijack:
+    - any:53
+    - tcp://any:53
+  endpoint-independent-nat: false
+
+dns:
+  enable: true
+  listen: 127.0.0.1:1053
+  ipv6: false
+  cache-algorithm: arc
+  prefer-h3: false
+  use-hosts: true
+  use-system-hosts: false
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+
+  # rule 模式只给少数兼容性域名返回真实 IP，其余使用 Fake-IP。
+  fake-ip-filter-mode: rule
+  fake-ip-filter:
+    - RULE-SET,lan_non_ip,real-ip
+    - DOMAIN,localhost,real-ip
+    - DOMAIN-SUFFIX,local,real-ip
+    - DOMAIN-SUFFIX,lan,real-ip
+    - DOMAIN,time.windows.com,real-ip
+    - DOMAIN,time.apple.com,real-ip
+    - DOMAIN-SUFFIX,ntp.org,real-ip
+    # 微信及腾讯图片/文件 CDN 对 Fake-IP 较敏感，使用真实 IP 提升传输兼容性。
+    - DOMAIN-SUFFIX,wechat.com,real-ip
+    - DOMAIN-SUFFIX,weixin.com,real-ip
+    - DOMAIN-SUFFIX,weixinbridge.com,real-ip
+    - DOMAIN-SUFFIX,qq.com,real-ip
+    - DOMAIN-SUFFIX,qpic.cn,real-ip
+    - DOMAIN-SUFFIX,qlogo.cn,real-ip
+    - DOMAIN-SUFFIX,gtimg.com,real-ip
+    - DOMAIN-SUFFIX,tencent.com,real-ip
+    - DOMAIN-SUFFIX,qcloud.com,real-ip
+    - DOMAIN-SUFFIX,myqcloud.com,real-ip
+    - DOMAIN-SUFFIX,tencent-cloud.net,real-ip
+    - MATCH,fake-ip
+
+  # DNS 上游连接遵守路由规则。国际 DoH 被明确送入 PROXY。
+  respect-rules: true
+
+  # 仅用于 DNS 上游域名的引导解析；这里使用 IP 形式的加密 DNS。
+  default-nameserver:
+    - https://223.5.5.5/dns-query
+    - https://1.12.12.12/dns-query
+
+  # 代理节点域名必须先通过可直连的加密 DNS 解析，避免“先有代理还是先解析节点”的循环。
+  proxy-server-nameserver:
+    - https://223.5.5.5/dns-query#DIRECT
+    - https://1.12.12.12/dns-query#DIRECT
+
+  # 直连应用使用国内加密 DNS，避免微信等国内服务拿到境外解析结果。
+  direct-nameserver:
+    - https://223.5.5.5/dns-query#DIRECT
+    - https://1.12.12.12/dns-query#DIRECT
+  direct-nameserver-follow-policy: true
+
+  # 国内/局域网规则使用国内加密 DNS；不回退到系统 DNS。
+  nameserver-policy:
+    'rule-set:lan_non_ip,direct_non_ip,domestic_non_ip,apple_cn,apple_cdn,apple_services,microsoft_cdn,microsoft_non_ip':
+      - https://223.5.5.5/dns-query#DIRECT
+      - https://1.12.12.12/dns-query#DIRECT
+    '+.cn':
+      - https://223.5.5.5/dns-query#DIRECT
+      - https://1.12.12.12/dns-query#DIRECT
+    '+.skk.moe':
+      - https://223.5.5.5/dns-query#DIRECT
+      - https://1.12.12.12/dns-query#DIRECT
+
+  # 默认国际 DNS：DoH 本身也经代理发送。
+  nameserver:
+    - https://1.1.1.1/dns-query#PROXY
+    - https://8.8.8.8/dns-query#PROXY
+
+proxy-groups:
+  - name: PROXY
+    type: select
+    default-selected: AUTO
+    proxies:
+      - AUTO
+      - 🇭🇰 香港
+      - 🇸🇬 新加坡
+      - 🇯🇵 日本
+      - 🇺🇸 美国
+      - 🇹🇼 台湾
+      - 🇰🇷 韩国
+      - 🇪🇺 欧洲
+      - 🧭 全部节点
+      - DIRECT
+
+  - name: AUTO
+    type: url-test
+    include-all: true
+    exclude-type: 'Direct|Reject|Pass|Compatible'
+    exclude-filter: '(?i)(套餐|流量|剩余|到期|重置|官网|客服|traffic|expire|subscription)'
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 50
+    lazy: true
+    timeout: 5000
+    expected-status: 204
+    empty-fallback: REJECT
+
+  - name: 🧭 全部节点
+    type: select
+    include-all: true
+    exclude-type: 'Direct|Reject|Pass|Compatible'
+    exclude-filter: '(?i)(套餐|流量|剩余|到期|重置|官网|客服|traffic|expire|subscription)'
+    empty-fallback: REJECT
+
+  - name: 🇭🇰 香港
+    type: select
+    include-all: true
+    exclude-type: 'Direct|Reject|Pass|Compatible'
+    exclude-filter: '(?i)(套餐|流量|剩余|到期|重置|官网|客服|traffic|expire|subscription)'
+    filter: '(?i)(香港|港|Hong[ -]?Kong|\bHK\b|\bHKG\b)'
+    empty-fallback: REJECT
+
+  - name: 🇸🇬 新加坡
+    type: select
+    include-all: true
+    exclude-type: 'Direct|Reject|Pass|Compatible'
+    exclude-filter: '(?i)(套餐|流量|剩余|到期|重置|官网|客服|traffic|expire|subscription)'
+    filter: '(?i)(新加坡|狮城|Singapore|\bSG\b|\bSIN\b)'
+    empty-fallback: REJECT
+
+  - name: 🇯🇵 日本
+    type: select
+    include-all: true
+    exclude-type: 'Direct|Reject|Pass|Compatible'
+    exclude-filter: '(?i)(套餐|流量|剩余|到期|重置|官网|客服|traffic|expire|subscription)'
+    filter: '(?i)(日本|东京|大阪|Japan|Tokyo|Osaka|\bJP\b|\bNRT\b)'
+    empty-fallback: REJECT
+
+  - name: 🇺🇸 美国
+    type: select
+    include-all: true
+    exclude-type: 'Direct|Reject|Pass|Compatible'
+    exclude-filter: '(?i)(套餐|流量|剩余|到期|重置|官网|客服|traffic|expire|subscription)'
+    filter: '(?i)(美国|美國|洛杉矶|洛杉磯|圣何塞|聖荷西|西雅图|西雅圖|纽约|紐約|United[ -]?States|America|Los[ -]?Angeles|San[ -]?Jose|Seattle|New[ -]?York|\bUS\b|\bUSA\b|\bLAX\b|\bSJC\b)'
+    empty-fallback: REJECT
+
+  - name: 🇹🇼 台湾
+    type: select
+    include-all: true
+    exclude-type: 'Direct|Reject|Pass|Compatible'
+    exclude-filter: '(?i)(套餐|流量|剩余|到期|重置|官网|客服|traffic|expire|subscription)'
+    filter: '(?i)(台湾|台灣|台北|Taiwan|Taipei|\bTW\b|\bTPE\b)'
+    empty-fallback: REJECT
+
+  - name: 🇰🇷 韩国
+    type: select
+    include-all: true
+    exclude-type: 'Direct|Reject|Pass|Compatible'
+    exclude-filter: '(?i)(套餐|流量|剩余|到期|重置|官网|客服|traffic|expire|subscription)'
+    filter: '(?i)(韩国|韓國|首尔|首爾|Korea|Seoul|\bKR\b|\bKOR\b|\bICN\b)'
+    empty-fallback: REJECT
+
+  - name: 🇪🇺 欧洲
+    type: select
+    include-all: true
+    exclude-type: 'Direct|Reject|Pass|Compatible'
+    exclude-filter: '(?i)(套餐|流量|剩余|到期|重置|官网|客服|traffic|expire|subscription)'
+    filter: '(?i)(欧洲|歐洲|英国|英國|德国|德國|法国|法國|荷兰|荷蘭|瑞士|意大利|西班牙|芬兰|瑞典|挪威|波兰|Europe|United[ -]?Kingdom|Britain|Germany|France|Netherlands|Switzerland|Italy|Spain|Finland|Sweden|Norway|Poland|\bEU\b|\bUK\b|\bGB\b|\bDE\b|\bFR\b|\bNL\b)'
+    empty-fallback: REJECT
+
+  - name: 🤖 AI
+    type: select
+    default-selected: 🇺🇸 美国
+    proxies:
+      - 🇺🇸 美国
+      - 🇯🇵 日本
+      - 🇸🇬 新加坡
+      - PROXY
+      - DIRECT
+
+  - name: ✈️ Telegram
+    type: select
+    default-selected: 🇸🇬 新加坡
+    proxies:
+      - 🇸🇬 新加坡
+      - 🇭🇰 香港
+      - 🇯🇵 日本
+      - PROXY
+      - DIRECT
+
+  - name: 🎬 Streaming
+    type: select
+    default-selected: PROXY
+    proxies:
+      - PROXY
+      - 🇺🇸 美国
+      - 🇯🇵 日本
+      - 🇸🇬 新加坡
+      - 🇭🇰 香港
+      - 🇹🇼 台湾
+      - 🇰🇷 韩国
+      - 🇪🇺 欧洲
+      - DIRECT
+
+  - name: 🍎 Apple
+    type: select
+    default-selected: DIRECT
+    proxies:
+      - DIRECT
+      - PROXY
+      - AUTO
+
+  - name: 🪟 Microsoft
+    type: select
+    default-selected: DIRECT
+    proxies:
+      - DIRECT
+      - PROXY
+      - AUTO
+
+  - name: 🚀 Speedtest
+    type: select
+    default-selected: DIRECT
+    proxies:
+      - DIRECT
+      - PROXY
+      - AUTO
+      - 🧭 全部节点
+
+  - name: 🇨🇳 国内应用
+    type: select
+    default-selected: DIRECT
+    proxies:
+      - DIRECT
+      - PROXY
+
+  # 选择 PASS 即可关闭对应拦截并继续匹配后续规则。扩展广告默认关闭。
+  - name: 🛡️ 基础广告
+    type: select
+    default-selected: REJECT
+    proxies:
+      - REJECT
+      - PASS
+
+  - name: 🧱 扩展广告
+    type: select
+    default-selected: PASS
+    proxies:
+      - PASS
+      - REJECT
+
+  - name: 🎣 钓鱼防护
+    type: select
+    default-selected: REJECT
+    proxies:
+      - REJECT
+      - PASS
+
+  # 默认阻断常见 STUN 端口，降低 WebRTC 暴露真实网络地址的概率；视频通话异常时选 PASS。
+  - name: 🔒 STUN 防护
+    type: select
+    default-selected: REJECT
+    proxies:
+      - REJECT
+      - PASS
+
+  - name: 🏁 FINAL
+    type: select
+    default-selected: PROXY
+    proxies:
+      - PROXY
+      - DIRECT
+      - REJECT
+
+# SukkaW 官方 Mihomo 规则使用 /Clash/.../*.txt。
+rule-providers:
+  reject_non_ip_drop:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/non_ip/reject-drop.txt
+    path: ./ruleset/sukka/reject_non_ip_drop.txt
+
+  reject_domainset:
+    type: http
+    behavior: domain
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/domainset/reject.txt
+    path: ./ruleset/sukka/reject_domainset.txt
+
+  reject_extra_domainset:
+    type: http
+    behavior: domain
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/domainset/reject_extra.txt
+    path: ./ruleset/sukka/reject_extra_domainset.txt
+
+  reject_phishing_domainset:
+    type: http
+    behavior: domain
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/domainset/reject_phishing.txt
+    path: ./ruleset/sukka/reject_phishing_domainset.txt
+
+  reject_non_ip:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/non_ip/reject.txt
+    path: ./ruleset/sukka/reject_non_ip.txt
+
+  reject_non_ip_no_drop:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/non_ip/reject-no-drop.txt
+    path: ./ruleset/sukka/reject_non_ip_no_drop.txt
+
+  reject_ip:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/ip/reject.txt
+    path: ./ruleset/sukka/reject_ip.txt
+
+  speedtest:
+    type: http
+    behavior: domain
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/domainset/speedtest.txt
+    path: ./ruleset/sukka/speedtest.txt
+
+  ai_non_ip:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/non_ip/ai.txt
+    path: ./ruleset/sukka/ai_non_ip.txt
+
+  apple_intelligence_non_ip:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/non_ip/apple_intelligence.txt
+    path: ./ruleset/sukka/apple_intelligence_non_ip.txt
+
+  ai_ip:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/ip/ai.txt
+    path: ./ruleset/sukka/ai_ip.txt
+
+  telegram_non_ip:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/non_ip/telegram.txt
+    path: ./ruleset/sukka/telegram_non_ip.txt
+
+  telegram_ip:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/ip/telegram.txt
+    path: ./ruleset/sukka/telegram_ip.txt
+
+  stream_us_non_ip:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/non_ip/stream_us.txt
+    path: ./ruleset/sukka/stream_us_non_ip.txt
+
+  stream_eu_non_ip:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/non_ip/stream_eu.txt
+    path: ./ruleset/sukka/stream_eu_non_ip.txt
+
+  stream_jp_non_ip:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/non_ip/stream_jp.txt
+    path: ./ruleset/sukka/stream_jp_non_ip.txt
+
+  stream_kr_non_ip:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/non_ip/stream_kr.txt
+    path: ./ruleset/sukka/stream_kr_non_ip.txt
+
+  stream_hk_non_ip:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/non_ip/stream_hk.txt
+    path: ./ruleset/sukka/stream_hk_non_ip.txt
+
+  stream_tw_non_ip:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/non_ip/stream_tw.txt
+    path: ./ruleset/sukka/stream_tw_non_ip.txt
+
+  stream_non_ip:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/non_ip/stream.txt
+    path: ./ruleset/sukka/stream_non_ip.txt
+
+  stream_us_ip:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/ip/stream_us.txt
+    path: ./ruleset/sukka/stream_us_ip.txt
+
+  stream_eu_ip:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/ip/stream_eu.txt
+    path: ./ruleset/sukka/stream_eu_ip.txt
+
+  stream_jp_ip:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/ip/stream_jp.txt
+    path: ./ruleset/sukka/stream_jp_ip.txt
+
+  stream_kr_ip:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/ip/stream_kr.txt
+    path: ./ruleset/sukka/stream_kr_ip.txt
+
+  stream_hk_ip:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/ip/stream_hk.txt
+    path: ./ruleset/sukka/stream_hk_ip.txt
+
+  stream_tw_ip:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/ip/stream_tw.txt
+    path: ./ruleset/sukka/stream_tw_ip.txt
+
+  stream_ip:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/ip/stream.txt
+    path: ./ruleset/sukka/stream_ip.txt
+
+  apple_cdn:
+    type: http
+    behavior: domain
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/domainset/apple_cdn.txt
+    path: ./ruleset/sukka/apple_cdn.txt
+
+  apple_services:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/non_ip/apple_services.txt
+    path: ./ruleset/sukka/apple_services.txt
+
+  apple_cn:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/non_ip/apple_cn.txt
+    path: ./ruleset/sukka/apple_cn.txt
+
+  microsoft_cdn:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/non_ip/microsoft_cdn.txt
+    path: ./ruleset/sukka/microsoft_cdn.txt
+
+  microsoft_non_ip:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/non_ip/microsoft.txt
+    path: ./ruleset/sukka/microsoft_non_ip.txt
+
+  lan_non_ip:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/non_ip/lan.txt
+    path: ./ruleset/sukka/lan_non_ip.txt
+
+  lan_ip:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/ip/lan.txt
+    path: ./ruleset/sukka/lan_ip.txt
+
+  direct_non_ip:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/non_ip/direct.txt
+    path: ./ruleset/sukka/direct_non_ip.txt
+
+  domestic_non_ip:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/non_ip/domestic.txt
+    path: ./ruleset/sukka/domestic_non_ip.txt
+
+  domestic_ip:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/ip/domestic.txt
+    path: ./ruleset/sukka/domestic_ip.txt
+
+  china_ip:
+    type: http
+    behavior: ipcidr
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/ip/china_ip.txt
+    path: ./ruleset/sukka/china_ip.txt
+
+  global_non_ip:
+    type: http
+    behavior: classical
+    format: text
+    interval: 43200
+    proxy: PROXY
+    url: https://ruleset.skk.moe/Clash/non_ip/global.txt
+    path: ./ruleset/sukka/global_non_ip.txt
+
+  # Blackmatrix7：高覆盖的微信/腾讯专项规则，master 分支每日生成。
+  blackmatrix_wechat:
+    type: http
+    behavior: classical
+    format: yaml
+    interval: 43200
+    proxy: PROXY
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/WeChat/WeChat.yaml
+    path: ./ruleset/blackmatrix7/wechat.yaml
+
+  blackmatrix_tencent:
+    type: http
+    behavior: classical
+    format: yaml
+    interval: 43200
+    proxy: PROXY
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Tencent/Tencent.yaml
+    path: ./ruleset/blackmatrix7/tencent.yaml
+
+  # MetaCubeX：Mihomo 原生 MRS，中国域名/IP 只作为 SukkaW 之后的兜底。
+  meta_cn_domain:
+    type: http
+    behavior: domain
+    format: mrs
+    interval: 86400
+    proxy: PROXY
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/cn.mrs
+    path: ./ruleset/metacubex/geosite-cn.mrs
+
+  meta_cn_ip:
+    type: http
+    behavior: ipcidr
+    format: mrs
+    interval: 86400
+    proxy: PROXY
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip/cn.mrs
+    path: ./ruleset/metacubex/geoip-cn.mrs
+
+rules:
+  # 局域网优先；对局域网设备建议使用 IP 访问，避免把 .local 查询交给系统 DNS。
+  - RULE-SET,lan_non_ip,DIRECT
+  - RULE-SET,lan_ip,DIRECT,no-resolve
+
+  # 本配置关闭 IPv6；即使客户端全局设置意外覆盖，也禁止不可达 IPv6 落入应用直连。
+  - IP-CIDR6,::/0,REJECT,no-resolve
+
+  # Windows 国内应用按进程优先直连，防止未收录连接落入 FINAL。
+  - PROCESS-NAME,WeChat.exe,🇨🇳 国内应用
+  - PROCESS-NAME,Weixin.exe,🇨🇳 国内应用
+  - PROCESS-NAME,WeChatAppEx.exe,🇨🇳 国内应用
+  - PROCESS-NAME,WeChatBrowser.exe,🇨🇳 国内应用
+  - PROCESS-NAME,QQ.exe,🇨🇳 国内应用
+  - PROCESS-NAME,TIM.exe,🇨🇳 国内应用
+  - PROCESS-NAME,DingTalk.exe,🇨🇳 国内应用
+  - PROCESS-NAME,Feishu.exe,🇨🇳 国内应用
+
+  # 进程识别暂时不可用时，微信与腾讯常用域名继续直连。
+  - DOMAIN-SUFFIX,wechat.com,🇨🇳 国内应用
+  - DOMAIN-SUFFIX,weixin.com,🇨🇳 国内应用
+  - DOMAIN-SUFFIX,weixinbridge.com,🇨🇳 国内应用
+  - DOMAIN-SUFFIX,qq.com,🇨🇳 国内应用
+  - DOMAIN-SUFFIX,qpic.cn,🇨🇳 国内应用
+  - DOMAIN-SUFFIX,qlogo.cn,🇨🇳 国内应用
+  - DOMAIN-SUFFIX,gtimg.com,🇨🇳 国内应用
+  - DOMAIN-SUFFIX,tencent.com,🇨🇳 国内应用
+  - DOMAIN-SUFFIX,qcloud.com,🇨🇳 国内应用
+  - DOMAIN-SUFFIX,myqcloud.com,🇨🇳 国内应用
+  - DOMAIN-SUFFIX,tencent-cloud.net,🇨🇳 国内应用
+  - RULE-SET,blackmatrix_wechat,🇨🇳 国内应用,no-resolve
+  - RULE-SET,blackmatrix_tencent,🇨🇳 国内应用,no-resolve
+
+  # 防止大型 CN 集合误收泄漏测试/出口检测域名；这些站点始终走代理 DNS 与代理出口。
+  - DOMAIN-SUFFIX,browserleaks.com,PROXY
+  - DOMAIN-SUFFIX,browserleaks.net,PROXY
+  - DOMAIN-SUFFIX,dnsleaktest.com,PROXY
+  - DOMAIN-SUFFIX,ipleak.net,PROXY
+  - DOMAIN-SUFFIX,surfshark.com,PROXY
+  - DOMAIN-SUFFIX,whoer.net,PROXY
+  - DOMAIN-SUFFIX,ipify.org,PROXY
+  - DOMAIN-SUFFIX,ipinfo.io,PROXY
+  - DOMAIN-SUFFIX,whatismyipaddress.com,PROXY
+  - DOMAIN,whoami.akamai.net,PROXY
+  - DOMAIN,whatismyip.akamai.com,PROXY
+
+  # 阻断常见应用自带加密 DNS。DoH 仍可伪装成普通 HTTPS，无法做到 100% 识别。
+  - DOMAIN,dns.google,REJECT
+  - DOMAIN,cloudflare-dns.com,REJECT
+  - DOMAIN,dns.quad9.net,REJECT
+  - DOMAIN,dns.adguard-dns.com,REJECT
+  - DOMAIN,dns.nextdns.io,REJECT
+  - DOMAIN,doh.opendns.com,REJECT
+  - DOMAIN,doh.cleanbrowsing.org,REJECT
+  - DOMAIN,doh.pub,REJECT
+  - DOMAIN,dns.alidns.com,REJECT
+  - DST-PORT,853,REJECT
+  - AND,((NETWORK,UDP),(DST-PORT,784)),REJECT
+  - AND,((NETWORK,UDP),(DST-PORT,8853)),REJECT
+
+  # 可选 STUN / WebRTC 旁路防护。
+  - AND,((NETWORK,UDP),(DST-PORT,3478-3481)),🔒 STUN 防护
+  - AND,((NETWORK,UDP),(DST-PORT,19302-19309)),🔒 STUN 防护
+
+  # 广告、隐私与钓鱼规则必须放在普通分流规则之前。
+  - RULE-SET,reject_non_ip_drop,🛡️ 基础广告
+  - RULE-SET,reject_domainset,🛡️ 基础广告
+  - RULE-SET,reject_extra_domainset,🧱 扩展广告
+  - RULE-SET,reject_phishing_domainset,🎣 钓鱼防护
+  - RULE-SET,reject_non_ip,🛡️ 基础广告
+  - RULE-SET,reject_non_ip_no_drop,🛡️ 基础广告
+
+  # 域名 / Non-IP 分流：放在 IP 规则之前，避免不必要的 DNS 解析。
+  - RULE-SET,speedtest,🚀 Speedtest
+  - RULE-SET,ai_non_ip,🤖 AI
+  - RULE-SET,apple_intelligence_non_ip,🤖 AI
+  - RULE-SET,telegram_non_ip,✈️ Telegram
+
+  - RULE-SET,stream_us_non_ip,🇺🇸 美国
+  - RULE-SET,stream_eu_non_ip,🇪🇺 欧洲
+  - RULE-SET,stream_jp_non_ip,🇯🇵 日本
+  - RULE-SET,stream_kr_non_ip,🇰🇷 韩国
+  - RULE-SET,stream_hk_non_ip,🇭🇰 香港
+  - RULE-SET,stream_tw_non_ip,🇹🇼 台湾
+  - RULE-SET,stream_non_ip,🎬 Streaming
+
+  - RULE-SET,apple_cn,DIRECT
+  - RULE-SET,apple_cdn,DIRECT
+  - RULE-SET,apple_services,🍎 Apple
+  - RULE-SET,microsoft_cdn,DIRECT
+  - RULE-SET,microsoft_non_ip,🪟 Microsoft
+
+  - RULE-SET,direct_non_ip,DIRECT
+  - RULE-SET,domestic_non_ip,DIRECT
+  - RULE-SET,meta_cn_domain,DIRECT
+  - RULE-SET,global_non_ip,PROXY
+
+  # IP 规则统一 no-resolve，避免为 IP 规则额外触发 DNS 查询。
+  - RULE-SET,reject_ip,🛡️ 基础广告,no-resolve
+  - RULE-SET,ai_ip,🤖 AI,no-resolve
+  - RULE-SET,telegram_ip,✈️ Telegram,no-resolve
+
+  - RULE-SET,stream_us_ip,🇺🇸 美国,no-resolve
+  - RULE-SET,stream_eu_ip,🇪🇺 欧洲,no-resolve
+  - RULE-SET,stream_jp_ip,🇯🇵 日本,no-resolve
+  - RULE-SET,stream_kr_ip,🇰🇷 韩国,no-resolve
+  - RULE-SET,stream_hk_ip,🇭🇰 香港,no-resolve
+  - RULE-SET,stream_tw_ip,🇹🇼 台湾,no-resolve
+  - RULE-SET,stream_ip,🎬 Streaming,no-resolve
+
+  - RULE-SET,domestic_ip,DIRECT,no-resolve
+  - RULE-SET,china_ip,DIRECT,no-resolve
+  - RULE-SET,meta_cn_ip,DIRECT,no-resolve
+  - MATCH,🏁 FINAL
