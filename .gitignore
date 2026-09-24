@@ -1,0 +1,12 @@
+# 私密订阅地址
+subscription-url.txt
+.env
+
+# 本机生成的含订阅地址配置
+generated/
+*.local.yaml
+*Local.yaml
+
+# 含真实节点或机场原始内容的文件
+*Official-Merged*.yaml
+official-base.yaml
