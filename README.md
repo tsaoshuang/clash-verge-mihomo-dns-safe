@@ -86,13 +86,20 @@ powershell -ExecutionPolicy Bypass -File .\build-local.ps1 -TemplateUrl "https:/
 
 1. 在 Clash Verge Rev 的“订阅”页面导入机场官方订阅地址，类型选择“远程”。
 2. 先单独激活官方订阅，确认节点能够正常测速和联网。
-3. 下载 [`Clash-Verge-Full-Extension.yaml`](./02-official-subscription-extension/Clash-Verge-Full-Extension.yaml)。
+3. 下载 [`Clash-Verge-Full-Extension.yaml`](./02-official-subscription-extension/Clash-Verge-Full-Extension.yaml) 和 [`Clash-Verge-Replace-Routing.js`](./02-official-subscription-extension/Clash-Verge-Replace-Routing.js)。
 4. 打开官方订阅卡片的右键或三点菜单，选择“扩展覆写配置 / 订阅扩展配置”。
 5. 如果界面要求选择扩展文件，导入上述 YAML；如果直接打开编辑器，则粘贴该文件全部内容并保存。
-6. 将这个扩展绑定到机场官方订阅，点击“重新激活”或重新选择该订阅。
-7. 按照上面的“共同软件设置”开启 TUN、严格路由和 DNS 劫持。
+6. 在同一订阅上打开“订阅扩展脚本”，导入上述 JS；如果打开编辑器，则粘贴脚本全部内容并保存。不要设置成全局扩展脚本。
+7. 点击“重新激活”或重新选择该订阅。
+8. 按照上面的“共同软件设置”开启 TUN、严格路由和 DNS 劫持。
 
 不同版本的菜单名称可能略有区别：新版通常称为“扩展覆写配置”或“扩展配置”，旧版可能显示为 `Merge`。
+
+配套脚本在 YAML 扩展之后执行，保留机场节点并强制清除机场自带的策略组与规则。重新激活后应只剩本模板的 22 个策略组、43 个规则提供器和 89 条规则，最后一条为 `MATCH,🏁 FINAL`。
+
+若之前已经绑定 YAML 扩展，现在只需增加配套的订阅扩展脚本。编辑脚本时用文件全文替换默认内容，不要放入已有 `main` 函数内部。两个文件都绑定到当前启用的同一个机场订阅。详细下载方法、排错和恢复步骤见 [第二版操作说明](./02-official-subscription-extension/README.md)。
+
+89 条是顶层路由规则，远程规则集内部仍包含大量域名与 IP。GitHub 模板更新后需同时替换 YAML 与 JS；本地编辑器中的内容不会自动更新。
 
 ### 更新节点或更换订阅地址
 
