@@ -695,6 +695,14 @@ rules:
 
   # 本配置关闭 IPv6；即使客户端全局设置意外覆盖，也禁止不可达 IPv6 落入应用直连。
   - IP-CIDR6,::/0,REJECT,no-resolve
+  # OpenAI 显式规则优先于国内应用进程规则。
+  - DOMAIN-SUFFIX,openai.com,🤖 AI
+  - DOMAIN-SUFFIX,chatgpt.com,🤖 AI
+  - DOMAIN-SUFFIX,oaistatic.com,🤖 AI
+  - DOMAIN-SUFFIX,oaiusercontent.com,🤖 AI
+  - DOMAIN-SUFFIX,oaistatsig.com,🤖 AI
+  - DOMAIN-SUFFIX,openaimerge.com,🤖 AI
+  - DOMAIN-SUFFIX,sora.com,🤖 AI
 
   # Windows 国内应用按进程优先直连，防止未收录连接落入 FINAL。
   - PROCESS-NAME,WeChat.exe,🇨🇳 国内应用
