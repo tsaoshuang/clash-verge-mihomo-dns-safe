@@ -95,11 +95,11 @@ powershell -ExecutionPolicy Bypass -File .\build-local.ps1 -TemplateUrl "https:/
 
 不同版本的菜单名称可能略有区别：新版通常称为“扩展覆写配置”或“扩展配置”，旧版可能显示为 `Merge`。
 
-配套脚本在 YAML 扩展之后执行，保留机场节点并强制清除机场自带的策略组与规则。重新激活后应只剩本模板的 22 个策略组、43 个规则提供器和 89 条规则，最后一条为 `MATCH,🏁 FINAL`。
+配套脚本在 YAML 扩展之后执行，保留机场节点并强制清除机场自带的策略组与规则。重新激活后应只剩本模板的 22 个策略组、43 个规则提供器和 96 条规则，最后一条为 `MATCH,🏁 FINAL`。
 
 若之前已经绑定 YAML 扩展，现在只需增加配套的订阅扩展脚本。编辑脚本时用文件全文替换默认内容，不要放入已有 `main` 函数内部。两个文件都绑定到当前启用的同一个机场订阅。详细下载方法、排错和恢复步骤见 [第二版操作说明](./02-official-subscription-extension/README.md)。
 
-89 条是顶层路由规则，远程规则集内部仍包含大量域名与 IP。GitHub 模板更新后需同时替换 YAML 与 JS；本地编辑器中的内容不会自动更新。
+96 条是顶层路由规则，远程规则集内部仍包含大量域名与 IP。GitHub 模板更新后需同时替换 YAML 与 JS；本地编辑器中的内容不会自动更新。
 
 ### 更新节点或更换订阅地址
 
@@ -136,3 +136,11 @@ DNS 泄漏测试显示多个 Google、Cloudflare、阿里或运营商递归解�
 - 真实订阅地址相当于账户凭据，不要提交到公开仓库。
 - 不要上传机场官方完整配置或脚本生成的本机配置。
 - 如果订阅地址曾经公开，请立即在机场后台重置。
+
+## OpenAI 域名走直连时的检查
+
+当前版本在国内应用进程规则之前加入 OpenAI 显式规则：`openai.com`、`chatgpt.com`、`oaistatic.com`、`oaiusercontent.com`、`oaistatsig.com`、`openaimerge.com`、`sora.com` 及其子域名统一交给 `🤖 AI` 策略组。
+
+扩展版必须同时更新 YAML 与 JS 并重新激活订阅；只改 YAML 会被脚本中的旧规则覆盖。在代理页面把 `🤖 AI` 选择为可用代理节点或地区组，确认下一级没有选择 `DIRECT`。`🤖 AI` 仍保留手动选择 DIRECT 的选项，因此命中 AI 组本身不保证走代理。
+
+关闭目标网站已有连接后重新访问，在连接页面核对规则是否为 `DOMAIN-SUFFIX,openai.com`，策略链是否为 `🤖 AI → 地区组 → 节点`。若仍显示 DIRECT，记录命中的规则和完整策略链，排查旧运行配置、前置自定义规则以及策略组选择。当前 [Sukka AI 规则](https://ruleset.skk.moe/Clash/non_ip/ai.txt)通过 `DOMAIN-KEYWORD,openai` 已覆盖 openai.com，显式规则用于提高优先级和便于诊断。
